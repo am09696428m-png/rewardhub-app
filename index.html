@@ -4,19 +4,121 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RewardHub</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-body{font-family:Arial,sans-serif;text-align:center;background:#f4f7fb;margin:0;padding:40px 20px}
-.card{max-width:420px;margin:auto;background:white;border-radius:18px;padding:30px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
-h1{margin-bottom:10px} p{color:#666}
-button{border:0;border-radius:12px;padding:14px 24px;font-size:16px;cursor:pointer}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#172033}
+.app{max-width:480px;margin:auto;min-height:100vh;padding:18px 16px 90px}
+.header{background:#fff;border-radius:18px;padding:20px;box-shadow:0 5px 20px #00000010}
+.header h1{margin:0 0 6px;font-size:25px}
+.header p{margin:0;color:#6b7280}
+.balance{margin-top:16px;background:#111827;color:white;border-radius:18px;padding:20px}
+.balance small{opacity:.75}.balance strong{display:block;font-size:30px;margin-top:7px}
+.section{display:none;margin-top:18px}
+.section.active{display:block}
+.card{background:#fff;border-radius:16px;padding:17px;margin-bottom:12px;box-shadow:0 4px 16px #00000008}
+.card h3{margin:0 0 7px}.card p{margin:0 0 12px;color:#6b7280}
+.btn{border:0;border-radius:11px;padding:11px 16px;background:#111827;color:#fff;cursor:pointer}
+.btn:disabled{opacity:.5}
+.nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:auto;background:#fff;border-top:1px solid #e5e7eb;display:flex;padding:8px 4px}
+.nav button{flex:1;border:0;background:none;padding:8px 2px;font-size:12px;color:#6b7280;cursor:pointer}
+.nav button.active{color:#111827;font-weight:bold}
+input{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;margin:8px 0 12px}
 </style>
 </head>
 <body>
-<div class="card">
-<h1>🎁 RewardHub</h1>
-<p>Welcome to RewardHub!</p>
-<p>Your rewards and tasks will appear here.</p>
-<button onclick="alert('Welcome to RewardHub!')">Get Started</button>
+<div class="app">
+  <div class="header">
+    <h1>🎁 RewardHub</h1>
+    <p id="welcome">Welcome!</p>
+  </div>
+
+  <div class="balance">
+    <small>Your Points</small>
+    <strong id="points">0</strong>
+  </div>
+
+  <section id="home" class="section active">
+    <div class="card">
+      <h3>Welcome to RewardHub</h3>
+      <p>Complete available tasks and collect points.</p>
+      <button class="btn" onclick="show('tasks')">View Tasks</button>
+    </div>
+  </section>
+
+  <section id="tasks" class="section">
+    <div class="card">
+      <h3>📋 Daily Task</h3>
+      <p>Open the task and complete the required action.</p>
+      <button class="btn" id="taskBtn" onclick="completeTask()">Complete Task +10</button>
+    </div>
+    <div class="card">
+      <h3>⭐ Coming Soon</h3>
+      <p>More legitimate tasks and rewards will be added here.</p>
+    </div>
+  </section>
+
+  <section id="refer" class="section">
+    <div class="card">
+      <h3>👥 Refer & Earn</h3>
+      <p>Invite friends to RewardHub. Your referral system can be connected to a backend later.</p>
+      <input id="refLink" readonly value="">
+      <button class="btn" onclick="copyRef()">Copy Link</button>
+    </div>
+  </section>
+
+  <section id="withdraw" class="section">
+    <div class="card">
+      <h3>💰 Withdraw</h3>
+      <p>Your current balance is <b id="withdrawPoints">0</b> points.</p>
+      <p>Withdrawal functionality will be connected after the reward rules and backend are configured.</p>
+      <button class="btn" disabled>Withdraw</button>
+    </div>
+  </section>
 </div>
+
+<nav class="nav">
+  <button class="active" onclick="show('home',this)">🏠<br>Home</button>
+  <button onclick="show('tasks',this)">📋<br>Tasks</button>
+  <button onclick="show('refer',this)">👥<br>Refer</button>
+  <button onclick="show('withdraw',this)">💰<br>Withdraw</button>
+</nav>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.ready(); tg.expand();}
+const user = tg?.initDataUnsafe?.user;
+if(user) document.getElementById('welcome').textContent='Welcome, '+(user.first_name||'friend')+'!';
+
+let points = Number(localStorage.getItem('rewardhub_points')||0);
+document.getElementById('points').textContent=points;
+document.getElementById('withdrawPoints').textContent=points;
+
+function show(id,btn){
+  document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else document.querySelector('.nav button').classList.add('active');
+}
+function completeTask(){
+  if(localStorage.getItem('rewardhub_task_done')==='1') return;
+  points+=10;
+  localStorage.setItem('rewardhub_points',points);
+  localStorage.setItem('rewardhub_task_done','1');
+  document.getElementById('points').textContent=points;
+  document.getElementById('withdrawPoints').textContent=points;
+  document.getElementById('taskBtn').textContent='Completed ✓';
+  document.getElementById('taskBtn').disabled=true;
+}
+function copyRef(){
+  const id=user?.id || 'YOUR_USER_ID';
+  const link='https://t.me/reward_hub08Bot?start=ref_'+id;
+  navigator.clipboard?.writeText(link);
+  document.getElementById('refLink').value=link;
+  tg?.showPopup?.({title:'Referral Link',message:'Referral link copied!',buttons:[{type:'ok'}]});
+}
+document.getElementById('refLink').value='Open Refer to generate your link';
+</script>
 </body>
 </html>
