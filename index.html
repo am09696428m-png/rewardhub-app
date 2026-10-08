@@ -84,41 +84,169 @@ input{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;margin:8p
   <button onclick="show('withdraw',this)">💰<br>Withdraw</button>
 </nav>
 
-<script>
+  <script>
 const tg = window.Telegram?.WebApp;
-if(tg){tg.ready(); tg.expand();}
+
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
+
+const SUPABASE_URL =
+  "https://ckrzoxzoqtomroriquvs.supabase.co";
+
+const SUPABASE_KEY =
+  "sb_publishable_WzuOq4ehPx96EWL0TEfIzQ_wpQ3IrjA";
+
+const AUTH_FUNCTION =
+  SUPABASE_URL + "/functions/v1/telegram-auth";
+
 const user = tg?.initDataUnsafe?.user;
-if(user) document.getElementById('welcome').textContent='Welcome, '+(user.first_name||'friend')+'!';
 
-let points = Number(localStorage.getItem('rewardhub_points')||0);
-document.getElementById('points').textContent=points;
-document.getElementById('withdrawPoints').textContent=points;
+async function connectUser() {
+  if (!tg || !tg.initData) {
+    document.getElementById("welcome").textContent =
+      "Please open RewardHub from Telegram.";
+    return;
+  }
 
-function show(id,btn){
-  document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  else document.querySelector('.nav button').classList.add('active');
+  try {
+    document.getElementById("welcome").textContent =
+      "Connecting...";
+
+    const response = await fetch(AUTH_FUNCTION, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_KEY
+      },
+      body: JSON.stringify({
+        initData: tg.initData
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Connection failed");
+    }
+
+    const dbUser = data.user;
+
+    document.getElementById("welcome").textContent =
+      "Welcome, " + (dbUser.first_name || "friend") + "!";
+
+    updatePoints(Number(dbUser.points || 0));
+
+    await loadTasks();
+
+  } catch (error) {
+    console.error(error);
+
+    document.getElementById("welcome").textContent =
+      "Connection error. Please try again.";
+  }
 }
-function completeTask(){
-  if(localStorage.getItem('rewardhub_task_done')==='1') return;
-  points+=10;
-  localStorage.setItem('rewardhub_points',points);
-  localStorage.setItem('rewardhub_task_done','1');
-  document.getElementById('points').textContent=points;
-  document.getElementById('withdrawPoints').textContent=points;
-  document.getElementById('taskBtn').textContent='Completed ✓';
-  document.getElementById('taskBtn').disabled=true;
+
+function updatePoints(points) {
+  document.getElementById("points").textContent = points;
+  document.getElementById("withdrawPoints").textContent = points;
 }
-function copyRef(){
-  const id=user?.id || 'YOUR_USER_ID';
-  const link='https://t.me/reward_hub08Bot?start=ref_'+id;
+
+async function loadTasks() {
+  const response = await fetch(
+    SUPABASE_URL +
+      "/rest/v1/tasks?select=id,title,description,reward,task_url&active=eq.true&order=id",
+    {
+      headers: {
+        "apikey": SUPABASE_KEY
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Could not load tasks");
+  }
+
+  const tasks = await response.json();
+
+  const tasksSection = document.getElementById("tasks");
+
+  tasksSection.innerHTML = "";
+
+  if (tasks.length === 0) {
+    tasksSection.innerHTML = `
+      <div class="card">
+        <h3>📋 No tasks available</h3>
+        <p>Please check again later.</p>
+      </div>
+    `;
+    return;
+  }
+
+  tasks.forEach(task => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <h3>${task.title}</h3>
+      <p>${task.description || ""}</p>
+      <p><b>Reward: +${task.reward} points</b></p>
+      <button class="btn" onclick="openTask('${task.task_url || ""}')">
+        Complete Task
+      </button>
+    `;
+
+    tasksSection.appendChild(card);
+  });
+}
+
+function openTask(url) {
+  if (!url) {
+    tg?.showAlert?.("Task link available nahi hai.");
+    return;
+  }
+
+  tg?.openTelegramLink?.(url);
+}
+
+function show(id, btn) {
+  document.querySelectorAll(".section").forEach(x =>
+    x.classList.remove("active")
+  );
+
+  document.getElementById(id).classList.add("active");
+
+  document.querySelectorAll(".nav button").forEach(x =>
+    x.classList.remove("active")
+  );
+
+  if (btn) {
+    btn.classList.add("active");
+  }
+}
+
+function copyRef() {
+  const id = user?.id || "YOUR_USER_ID";
+
+  const link =
+    "https://t.me/reward_hub08Bot?start=ref_" + id;
+
   navigator.clipboard?.writeText(link);
-  document.getElementById('refLink').value=link;
-  tg?.showPopup?.({title:'Referral Link',message:'Referral link copied!',buttons:[{type:'ok'}]});
+
+  document.getElementById("refLink").value = link;
+
+  tg?.showPopup?.({
+    title: "Referral Link",
+    message: "Referral link copied!",
+    buttons: [{ type: "ok" }]
+  });
 }
-document.getElementById('refLink').value='Open Refer to generate your link';
+
+document.getElementById("refLink").value =
+  user
+    ? "https://t.me/reward_hub08Bot?start=ref_" + user.id
+    : "Open from Telegram";
+
+connectUser();
 </script>
-</body>
-</html>
